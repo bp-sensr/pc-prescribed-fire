@@ -46,6 +46,11 @@ library(sf)
 library(vegan)
 library(tinytex)
 library(knitr)
+library(htmlwidgets)
+library(broom)
+library(ggforce)
+library(kableExtra)
+library(webshot2)
 library(leaflet)
 
 load("pc-fire.RData")
@@ -151,7 +156,7 @@ Data were collected using passive autonomous recording units (ARUs; @Shonfield20
 #| fig-cap: Locations surveyed for prescribed fire monitoring.
 #| label: fig-aru-monitoring-locations
 
-leaflet() |>
+m <- leaflet() |>
   addTiles() |>
   addPolygons(
     data = parks,
@@ -167,6 +172,22 @@ leaflet() |>
   addMeasure(primaryLengthUnit = "meters",
              primaryAreaUnit = "sqmeters") |>
   addMiniMap(position = "bottomleft")
+
+if (is_html_output()) {
+  m
+} else {
+  map_file <- "map_aru_locations.png"
+  if (!file.exists(map_file)) {
+    tmp_html <- tempfile(fileext = ".html")
+    saveWidget(m, tmp_html, selfcontained = TRUE)
+    webshot(
+      tmp_html, file = map_file,
+      vwidth = 1000, vheight = 700,
+      delay = 8
+    )
+  }
+  include_graphics(map_file)
+}
 
 ```
 
@@ -335,7 +356,11 @@ paired_df <- burns_fire_paired |>
   filter(!is.na(pre_richness) & !is.na(post_richness))  # keep only locations with both
 
 # Wilcoxon signed-rank test (paired)
-wilcox.test(paired_df$post_richness, paired_df$pre_richness, paired = TRUE)
+wilcox.test(paired_df$post_richness, paired_df$pre_richness, paired = TRUE, conf.int = TRUE) |>
+  tidy() |>
+  select(Statistic = statistic, `p-value` = p.value,
+         Estimate = estimate, Lower = conf.low, Upper = conf.high) |>
+  kable(digits = 3, caption = "Wilcoxon signed-rank test")
 
 ```
 
@@ -530,7 +555,7 @@ Prescribed burns typically occur outside the migratory breeding bird season; the
 
 Both resident and migratory species may respond to changes in burn state. Migratory species, in particular, may temporarily avoid burned areas or pass through them, although empirical evidence remains limited. Long-term acoustic monitoring using stationary ARUs placed within or adjacent to burn areas provides an effective approach for assessing site use and changes in community composition over time.
 
-Recording effort should be consistent across the park system to support comparability among sites and years. For single-visit point counts, a minimum of 11 minutes of recording per session is recommended, which includes buffer time for the observer to initiate and complete a 10-minute acoustic survey. For surveys using pre-programmed ARUs, we recommend a staggered recording schedule distributed across seasons (winter, spring, summer, and post-breeding) and times of day (@tbl-blocks).
+Recording effort should be consistent across the park system to support comparability among sites and years. For single-visit point counts, a minimum of 11 minutes of recording per session is recommended, which includes buffer time for the observer to initiate and complete a 10-minute acoustic survey. For surveys using pre-programmed ARUs, we recommend a staggered recording schedule distributed across seasons (winter, spring, summer, and post-breeding) and times of day (@fig-blocks).
 
 Recordings are organized into blocks representing short (3–10 minute) sampling periods spread across the season and diurnal cycle. This staggered design balances logistical constraints with ecological coverage, providing a robust dataset for characterizing bird communities and evaluating responses before, during, and after prescribed fire events.
 
@@ -540,53 +565,96 @@ Recordings are organized into blocks representing short (3–10 minute) sampling
 #| eval: true
 #| warning: false
 #| message: false
-#| label: tbl-blocks
-#| collapse: true
-#| code-fold: true
-#| tbl-cap: Recommendation for pre-programmed long-term ARU scheduling. Complements the Alberta Biodiversity Monitoring Institute's Ecosystem Health and Biodiversity Trajectories programs.
+#| label: fig-blocks
+#| fig-width: 8
+#| fig-height: 2.8
+#| fig-cap: "Recommended pre-programmed schedule for long-term autonomous recording unit (ARU) deployments across the field season. Rows show the daily recording period (midnight, dawn, post-dawn) and columns span Julian days 90 to 210, with calendar dates shown above Julian day numbers on the x-axis. Numbered blocks indicate the seasonal window within which the recording used for point-count analysis is randomly selected for each period. The schedule complements the Alberta Biodiversity Monitoring Institute's Ecosystem Health and Biodiversity Trajectories programs."
 
-library(tidyverse)
-library(knitr)
-library(kableExtra)
-
-# Define the daily recording times for each block (simplified)
-daily_times <- tibble(
-  blocks = 1:12,
-  Daily_Times = list(
-    c("00:00", "02:00"),        # Block 1
-    c("05:37", "07:07"),        # Block 2
-    c("12:00", "15:00"),        # Block 3
-    c("21:10", "23:10"),        # Block 4
-    c("00:00", "02:00"),        # Block 5 (example repeat, adjust as needed)
-    c("05:37", "07:07"),        # Block 6
-    c("12:00", "15:00"),        # Block 7
-    c("21:10", "23:10"),        # Block 8
-    c("00:00", "02:00"),        # Block 9
-    c("05:37", "07:07"),        # Block 10
-    c("12:00", "15:00"),        # Block 11
-    c("21:10", "23:10")         # Block 12
+blocks <- tribble(
+  ~block, ~period,     ~time_index, ~start, ~end,
+   1,     "Dawn",      3,            90,    105,
+   2,     "Post-dawn", 4,           105,    120,
+   3,     "Dawn",      3,           120,    140,
+   4,     "Dawn",      3,           140,    150,
+   5,     "Post-dawn", 4,           150,    160,
+   6,     "Dawn",      3,           160,    170,
+   7,     "Post-dawn", 4,           170,    180,
+   8,     "Post-dawn", 4,           180,    210,
+   9,     "Midnight",  1,            90,    140,
+  10,     "Midnight",  1,           140,    160,
+  11,     "Midnight",  1,           160,    180,
+  12,     "Midnight",  1,           180,    210
+) |>
+  mutate(
+    period = factor(period, levels = c("Midnight", "Dawn", "Post-dawn")),
+    y      = as.numeric(fct_rev(period)),
+    gap    = 0.4,
+    xmin   = start + gap, xmax = end - gap,
+    ymin   = y - 0.37,    ymax = y + 0.37
   )
-)
 
-# # Summarize seasonal schedule
-# recs_table <- abmib |>
-#   filter(!is.na(blocks)) |>
-#   group_by(blocks) |>
-#   summarise(
-#     Julian_Days = paste(range(julian), collapse = "-"),
-#     Recording_min = unique(recs),
-#     .groups = "drop"
-#   ) |>
-#   left_join(daily_times, by = "blocks") |>
-#   arrange(blocks)
-# 
-# # Convert daily times to a single string per row for table
-# recs_table <- recs_table |>
-#   mutate(Daily_Times = map_chr(Daily_Times, ~ paste(.x, collapse = ", ")))
-# 
-# # Output nicely formatted table
-# kable(recs_table)
+poly <- blocks |>
+  rowwise() |>
+  reframe(
+    block, period,
+    x = c(xmin, xmax, xmax, xmin),
+    y = c(ymin, ymin, ymax, ymax)
+  )
 
+# Axis labels: "Mar 31" over Julian day
+jd_breaks <- c(90, 105, 120, 140, 160, 180, 210)
+d <- as.Date(jd_breaks - 1, origin = "2026-01-01")
+jd_labels <- paste0(format(d, "%b "), as.integer(format(d, "%d")), "\n", jd_breaks)
+
+# Row labels drawn as text (no HTML needed)
+row_labels <- blocks |> distinct(period, time_index, y)
+
+fills   <- c(Midnight = "#EEECFD", Dawn = "#E1F5EE", `Post-dawn` = "#FAECE7")
+borders <- c(Midnight = "#5B4BC4", Dawn = "#0F6E56", `Post-dawn` = "#993C1D")
+texts   <- c(Midnight = "#3C3489", Dawn = "#085041", `Post-dawn` = "#712B13")
+
+ggplot() +
+  geom_shape(
+    data = poly,
+    aes(x, y, group = block, fill = period, colour = period),
+    radius = unit(1.5, "mm"), linewidth = 0.5
+  ) +
+  geom_text(
+    data = blocks,
+    aes(x = (start + end) / 2, y = y, label = block),
+    colour = texts[as.character(blocks$period)], size = 4.5
+  ) +
+  # bold period name + grey time index, left of the panel
+  geom_text(
+    data = row_labels,
+    aes(x = 87, y = y + 0.12, label = period),
+    hjust = 1, fontface = "bold", size = 4.2
+  ) +
+  geom_text(
+    data = row_labels,
+    aes(x = 87, y = y - 0.15, label = paste("time_index", time_index)),
+    hjust = 1, colour = "grey35", size = 3.2
+  ) +
+  scale_fill_manual(values = fills) +
+  scale_colour_manual(values = borders) +
+  scale_x_continuous(
+    breaks = jd_breaks, labels = jd_labels,
+    limits = c(89, 211), expand = c(0, 0)
+  ) +
+  scale_y_continuous(limits = c(0.5, 3.5), expand = c(0, 0)) +
+  coord_cartesian(clip = "off") +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position    = "none",
+    panel.grid.minor   = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(colour = "grey90", linewidth = 0.3),
+    plot.background   = element_rect(fill = "#FCFCFA", colour = NA),
+    axis.text.y       = element_blank(),
+    axis.text.x       = element_text(lineheight = 1.1, colour = "grey30"),
+    plot.margin       = margin(5, 5, 5, 75)
+  )
 ```
 
 ## Burn severity
