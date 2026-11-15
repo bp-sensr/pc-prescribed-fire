@@ -157,22 +157,20 @@ leaflet() |>
     data = parks,
     popup = ~adminAreaN,
     fillOpacity = 0.4,
-    color = "green"
-  ) |>
+    color = "green") |>
   addCircleMarkers(
     data = burn_locs,
     popup = ~paste("Location:", location),
     fillOpacity = 1,
     color = "black",
-    radius = 6
-  ) |>
+    radius = 6) |>
   addMeasure(primaryLengthUnit = "meters",
              primaryAreaUnit = "sqmeters") |>
   addMiniMap(position = "bottomleft")
 
 ```
 
-Recordings were summarized by month and park to characterize the temporal distribution of sampling effort across each region and year (@fig-recordings-locations). Sampling occurred primarily during the breeding season (April–July), with the majority of effort concentrated in June. Temporal coverage varied among parks with sampling in single years and others sampled repeatedly across multiple years (@tbl-loc-summary). Monthly sample sizes ranged from low replication in some early or late-season deployments to higher levels of effort in core sampling months, reflecting differences in deployment timing, park-level logistics, and local program objectives.
+Recordings were summarized by month and park to characterize the temporal distribution of sampling effort across each region and year (@fig-recordings-locations). Sampling occurred primarily during the breeding season (April–July), with the majority of effort concentrated in June. Temporal coverage varied among parks with sampling in single years and others sampled repeatedly across multiple years. Monthly sample sizes ranged from low replication in some early or late-season deployments to higher levels of effort in core sampling months, reflecting differences in deployment timing, park-level logistics, and local program objectives.
 
 ```{r}
 #| echo: false
@@ -181,7 +179,7 @@ Recordings were summarized by month and park to characterize the temporal distri
 #| message: false
 #| include: true
 #| fig-align: center
-#| fig-cap: Locations from Jasper National Park ARU EI Monitoring Program.
+#| fig-cap: Tempral distribution of recording effort by Park.
 #| label: fig-recordings-locations
 
 burns |>
@@ -284,7 +282,7 @@ Collectively, these results indicate that fire did not consistently reduce speci
 #| label: tbl-paired
 #| tbl-cap: List of locations including vegetation type, year burned an frequency burned (total count of historical burns).
 
-kable(pf_fire_locs |> select(-location_id))
+kable(pf_fire_locs |> select(-location_id, -veg_type))
 
 ```
 
